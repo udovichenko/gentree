@@ -13,15 +13,11 @@ export type PersonNodeData = {
   baseColorFemale?: string;
 };
 
-// Тип для узла семьи (невидимая точка соединения)
-export type FamilyNodeData = Record<string, never>;
-
 // Общий тип для всех узлов
-export type TreeNode = Node<PersonNodeData | FamilyNodeData>;
+export type TreeNode = Node<PersonNodeData>;
 
-export type TreeEdge = Edge<{
-  spouseMidX?: number;
-}>;
+// Тип для рёбер (сейчас не используется, линии рисуются FamilyLines)
+export type TreeEdge = Edge<Record<string, never>>;
 
 // Проверка, скрыт ли человек
 function isPersonHidden(person: Person, settings: TreeSettings): boolean {
@@ -204,10 +200,290 @@ function normalizeGenerations(generations: Map<string, number>): Map<string, num
   return normalized;
 }
 
-// Константы раскладки (дефолтные)
+// Константы раскладки (должны совпадать с FamilyLines)
 const CARD_WIDTH = 200;
 const CARD_HEIGHT = 120;
-const FAMILY_NODE_SIZE = 10;
+
+// ============== НОВЫЙ АЛГОРИТМ РАСКЛАДКИ ==============
+
+// Функция раскладки дерева с учётом семейных связей
+function layoutTree(
+  tree: FamilyTree,
+  visiblePersons: Set<string>,
+  generations: Map<string, number>,
+  horizontalGap: number,
+  verticalGap: number
+): Map<string, { x: number; y: number }> {
+  const positions = new Map<string, { x: number; y: number }>();
+  const placed = new Set<string>();
+  
+  // Находим все семьи с видимыми членами
+  const visibleFamilies: Array<{ familyId: string; gen: number }> = [];
+  
+  for (const [familyId, family] of tree.families) {
+    const hasVisibleMember = 
+      (family.husbandId && visiblePersons.has(family.husbandId)) ||
+      (family.wifeId && visiblePersons.has(family.wifeId)) ||
+      family.childrenIds.some(id => visiblePersons.has(id));
+    
+    if (hasVisibleMember) {
+      // Определяем поколение семьи по родителям
+      let gen = 0;
+      if (family.husbandId && generations.has(family.husbandId)) {
+        gen = generations.get(family.husbandId)!;
+      } else if (family.wifeId && generations.has(family.wifeId)) {
+        gen = generations.get(family.wifeId)!;
+      }
+      visibleFamilies.push({ familyId, gen });
+    }
+  }
+  
+  // Сортируем семьи по поколению (от старших к младшим)
+  visibleFamilies.sort((a, b) => a.gen - b.gen);
+  
+  // Рекурсивная функция для расчёта ширины поддерева
+  function calculateSubtreeWidth(personId: string, visited: Set<string> = new Set()): number {
+    if (visited.has(personId) || !visiblePersons.has(personId)) return 0;
+    visited.add(personId);
+    
+    const person = tree.persons.get(personId);
+    if (!person) return CARD_WIDTH;
+    
+    // Находим семьи, где этот человек - родитель
+    let totalChildrenWidth = 0;
+    
+    for (const familyId of person.spouseFamilyIds) {
+      const family = tree.families.get(familyId);
+      if (!family) continue;
+      
+      // Ширина детей
+      const childrenWidths = family.childrenIds
+        .filter(id => visiblePersons.has(id) && !visited.has(id))
+        .map(id => calculateSubtreeWidth(id, visited));
+      
+      if (childrenWidths.length > 0) {
+        totalChildrenWidth += childrenWidths.reduce((a, b) => a + b, 0) + 
+          (childrenWidths.length - 1) * horizontalGap;
+      }
+    }
+    
+    return Math.max(CARD_WIDTH, totalChildrenWidth);
+  }
+  
+  // Функция для размещения семьи (супруги + дети)
+  function placeFamily(
+    familyId: string,
+    centerX: number,
+    processedFamilies: Set<string>
+  ): number {
+    if (processedFamilies.has(familyId)) return 0;
+    processedFamilies.add(familyId);
+    
+    const family = tree.families.get(familyId);
+    if (!family) return 0;
+    
+    const husbandVisible = family.husbandId && visiblePersons.has(family.husbandId);
+    const wifeVisible = family.wifeId && visiblePersons.has(family.wifeId);
+    
+    // Вычисляем поколение родителей
+    let parentGen = 0;
+    if (husbandVisible && generations.has(family.husbandId!)) {
+      parentGen = generations.get(family.husbandId!)!;
+    } else if (wifeVisible && generations.has(family.wifeId!)) {
+      parentGen = generations.get(family.wifeId!)!;
+    }
+    
+    const parentY = parentGen * (CARD_HEIGHT + verticalGap);
+    
+    // Собираем видимых детей
+    const visibleChildren = family.childrenIds.filter(id => visiblePersons.has(id));
+    
+    // Рассчитываем ширину поддеревьев каждого ребёнка
+    const childSubtreeWidths: Array<{ id: string; width: number }> = [];
+    for (const childId of visibleChildren) {
+      if (!placed.has(childId)) {
+        const width = calculateSubtreeWidth(childId, new Set(placed));
+        childSubtreeWidths.push({ id: childId, width: Math.max(width, CARD_WIDTH) });
+      }
+    }
+    
+    // Общая ширина всех детей
+    let totalChildrenWidth = 0;
+    if (childSubtreeWidths.length > 0) {
+      totalChildrenWidth = childSubtreeWidths.reduce((sum, c) => sum + c.width, 0) +
+        (childSubtreeWidths.length - 1) * horizontalGap;
+    }
+    
+    // Ширина родителей
+    let parentsWidth = 0;
+    if (husbandVisible && wifeVisible) {
+      parentsWidth = 2 * CARD_WIDTH + horizontalGap;
+    } else if (husbandVisible || wifeVisible) {
+      parentsWidth = CARD_WIDTH;
+    }
+    
+    // Итоговая ширина семьи
+    const familyWidth = Math.max(parentsWidth, totalChildrenWidth);
+    
+    // Размещаем родителей по центру
+    if (husbandVisible && wifeVisible && !placed.has(family.husbandId!) && !placed.has(family.wifeId!)) {
+      // Муж слева, жена справа
+      const husbandX = centerX - horizontalGap / 2 - CARD_WIDTH;
+      const wifeX = centerX + horizontalGap / 2;
+      
+      positions.set(family.husbandId!, { x: husbandX, y: parentY });
+      positions.set(family.wifeId!, { x: wifeX, y: parentY });
+      placed.add(family.husbandId!);
+      placed.add(family.wifeId!);
+    } else if (husbandVisible && !placed.has(family.husbandId!)) {
+      positions.set(family.husbandId!, { x: centerX - CARD_WIDTH / 2, y: parentY });
+      placed.add(family.husbandId!);
+    } else if (wifeVisible && !placed.has(family.wifeId!)) {
+      positions.set(family.wifeId!, { x: centerX - CARD_WIDTH / 2, y: parentY });
+      placed.add(family.wifeId!);
+    }
+    
+    // Размещаем детей
+    if (childSubtreeWidths.length > 0) {
+      const childY = (parentGen + 1) * (CARD_HEIGHT + verticalGap);
+      let currentX = centerX - totalChildrenWidth / 2;
+      
+      for (const { id: childId, width: subtreeWidth } of childSubtreeWidths) {
+        if (!placed.has(childId)) {
+          const childCenterX = currentX + subtreeWidth / 2;
+          positions.set(childId, { x: childCenterX - CARD_WIDTH / 2, y: childY });
+          placed.add(childId);
+          
+          // Рекурсивно размещаем семьи этого ребёнка
+          const child = tree.persons.get(childId);
+          if (child) {
+            for (const childFamilyId of child.spouseFamilyIds) {
+              placeFamily(childFamilyId, childCenterX, processedFamilies);
+            }
+          }
+          
+          currentX += subtreeWidth + horizontalGap;
+        }
+      }
+    }
+    
+    return familyWidth;
+  }
+  
+  // Находим корневую точку - самую старшую семью с rootPerson или первую семью
+  const rootPersonId = tree.settings.rootPersonId;
+  let startFamilyId: string | null = null;
+  
+  if (rootPersonId) {
+    const rootPerson = tree.persons.get(rootPersonId);
+    if (rootPerson?.parentFamilyId) {
+      startFamilyId = rootPerson.parentFamilyId;
+    } else if (rootPerson?.spouseFamilyIds.length) {
+      startFamilyId = rootPerson.spouseFamilyIds[0];
+    }
+  }
+  
+  // Если не нашли стартовую семью, берём самую старшую
+  if (!startFamilyId && visibleFamilies.length > 0) {
+    startFamilyId = visibleFamilies[0].familyId;
+  }
+  
+  // Размещаем дерево от корня
+  const processedFamilies = new Set<string>();
+  
+  // Сначала размещаем предков (идём вверх)
+  function placeAncestors(personId: string, childCenterX: number) {
+    const person = tree.persons.get(personId);
+    if (!person || !person.parentFamilyId) return;
+    
+    const family = tree.families.get(person.parentFamilyId);
+    if (!family || processedFamilies.has(person.parentFamilyId)) return;
+    
+    processedFamilies.add(person.parentFamilyId);
+    
+    const husbandVisible = family.husbandId && visiblePersons.has(family.husbandId);
+    const wifeVisible = family.wifeId && visiblePersons.has(family.wifeId);
+    
+    if (!husbandVisible && !wifeVisible) return;
+    
+    // Вычисляем поколение родителей
+    const parentGen = generations.get(personId)! - 1;
+    const parentY = parentGen * (CARD_HEIGHT + verticalGap);
+    
+    // Размещаем родителей над ребёнком
+    if (husbandVisible && wifeVisible && !placed.has(family.husbandId!) && !placed.has(family.wifeId!)) {
+      const husbandX = childCenterX - horizontalGap / 2 - CARD_WIDTH;
+      const wifeX = childCenterX + horizontalGap / 2;
+      
+      positions.set(family.husbandId!, { x: husbandX, y: parentY });
+      positions.set(family.wifeId!, { x: wifeX, y: parentY });
+      placed.add(family.husbandId!);
+      placed.add(family.wifeId!);
+      
+      // Рекурсивно размещаем предков
+      placeAncestors(family.husbandId!, husbandX + CARD_WIDTH / 2);
+      placeAncestors(family.wifeId!, wifeX + CARD_WIDTH / 2);
+    } else if (husbandVisible && !placed.has(family.husbandId!)) {
+      positions.set(family.husbandId!, { x: childCenterX - CARD_WIDTH / 2, y: parentY });
+      placed.add(family.husbandId!);
+      placeAncestors(family.husbandId!, childCenterX);
+    } else if (wifeVisible && !placed.has(family.wifeId!)) {
+      positions.set(family.wifeId!, { x: childCenterX - CARD_WIDTH / 2, y: parentY });
+      placed.add(family.wifeId!);
+      placeAncestors(family.wifeId!, childCenterX);
+    }
+  }
+  
+  // Начинаем с корневого человека
+  if (rootPersonId && visiblePersons.has(rootPersonId)) {
+    const rootGen = generations.get(rootPersonId) || 0;
+    const rootY = rootGen * (CARD_HEIGHT + verticalGap);
+    
+    // Сначала размещаем корневого человека
+    positions.set(rootPersonId, { x: -CARD_WIDTH / 2, y: rootY });
+    placed.add(rootPersonId);
+    
+    // Размещаем предков
+    placeAncestors(rootPersonId, 0);
+    
+    // Размещаем семьи (супруг + дети)
+    const rootPerson = tree.persons.get(rootPersonId);
+    if (rootPerson) {
+      for (const familyId of rootPerson.spouseFamilyIds) {
+        placeFamily(familyId, 0, processedFamilies);
+      }
+    }
+  }
+  
+  // Размещаем оставшиеся семьи (если есть)
+  for (const { familyId } of visibleFamilies) {
+    if (!processedFamilies.has(familyId)) {
+      // Находим свободное место справа
+      let maxX = 0;
+      for (const pos of positions.values()) {
+        maxX = Math.max(maxX, pos.x + CARD_WIDTH);
+      }
+      placeFamily(familyId, maxX + horizontalGap + CARD_WIDTH, processedFamilies);
+    }
+  }
+  
+  // Размещаем оставшихся людей без семей
+  let nextX = 0;
+  for (const pos of positions.values()) {
+    nextX = Math.max(nextX, pos.x + CARD_WIDTH + horizontalGap);
+  }
+  
+  for (const personId of visiblePersons) {
+    if (!placed.has(personId)) {
+      const gen = generations.get(personId) || 0;
+      const y = gen * (CARD_HEIGHT + verticalGap);
+      positions.set(personId, { x: nextX, y });
+      nextX += CARD_WIDTH + horizontalGap;
+    }
+  }
+  
+  return positions;
+}
 
 // Построение узлов и рёбер для React Flow
 export function buildFlowGraph(tree: FamilyTree): { nodes: TreeNode[]; edges: TreeEdge[]; generationYPositions: Map<number, number> } {
@@ -218,213 +494,50 @@ export function buildFlowGraph(tree: FamilyTree): { nodes: TreeNode[]; edges: Tr
   const verticalGap = tree.settings.verticalSpacing ?? 150;
   const horizontalGap = tree.settings.horizontalSpacing ?? 50;
   
-  // Группируем по поколениям
-  const generationGroups = new Map<number, string[]>();
-  for (const [personId, gen] of generations) {
-    if (!generationGroups.has(gen)) {
-      generationGroups.set(gen, []);
-    }
-    generationGroups.get(gen)!.push(personId);
-  }
+  // Используем новый алгоритм раскладки
+  const positions = layoutTree(tree, visiblePersons, generations, horizontalGap, verticalGap);
   
   // Сохраняем Y-позиции поколений для ограничения вертикального перемещения
   const generationYPositions = new Map<number, number>();
+  const uniqueGenerations = new Set(generations.values());
+  for (const gen of uniqueGenerations) {
+    generationYPositions.set(gen, gen * (CARD_HEIGHT + verticalGap));
+  }
   
   // Создаем узлы с позициями
   const nodes: TreeNode[] = [];
 
-  for (const [gen, personIds] of generationGroups) {
-    const y = gen * (CARD_HEIGHT + verticalGap);
-    generationYPositions.set(gen, y);
+  for (const [personId, pos] of positions) {
+    const person = tree.persons.get(personId);
+    if (!person) continue;
     
-    const totalWidth = personIds.length * CARD_WIDTH + (personIds.length - 1) * horizontalGap;
-    const startX = -totalWidth / 2;
+    const gen = generations.get(personId) ?? 0;
     
-    personIds.forEach((personId, index) => {
-      const person = tree.persons.get(personId);
-      if (!person) return;
-      
-      // Учитываем кастомное смещение (только по X)
-      let x = startX + index * (CARD_WIDTH + horizontalGap);
-      
-      if (person.displaySettings?.customPosition) {
-        x += person.displaySettings.customPosition.offsetX;
-      }
-      
-      nodes.push({
-        id: personId,
-        type: 'personCard',
-        position: { x, y },
-        data: {
-          person,
-          isRoot: personId === tree.settings.rootPersonId,
-          showPhoto: tree.settings.showPhotos,
-          generation: gen,
-          baseColorMale: tree.settings.baseColorMale,
-          baseColorFemale: tree.settings.baseColorFemale,
-        },
-        sourcePosition: Position.Bottom,
-        targetPosition: Position.Top,
-      });
+    // Учитываем кастомное смещение (только по X)
+    let x = pos.x;
+    if (person.displaySettings?.customPosition) {
+      x += person.displaySettings.customPosition.offsetX;
+    }
+    
+    nodes.push({
+      id: personId,
+      type: 'personCard',
+      position: { x, y: pos.y },
+      data: {
+        person,
+        isRoot: personId === tree.settings.rootPersonId,
+        showPhoto: tree.settings.showPhotos,
+        generation: gen,
+        baseColorMale: tree.settings.baseColorMale,
+        baseColorFemale: tree.settings.baseColorFemale,
+      },
+      sourcePosition: Position.Bottom,
+      targetPosition: Position.Top,
     });
   }
   
-  // Сохраняем позиции узлов для расчёта позиций семейных узлов
-  const nodePositions = new Map<string, { x: number; y: number }>();
-  for (const node of nodes) {
-    nodePositions.set(node.id, { x: node.position.x, y: node.position.y });
-  }
-  
-  // Создаём семейные узлы (невидимые точки соединения) и рёбра
+  // Edges больше не создаём - линии рисуются компонентом FamilyLines
   const edges: TreeEdge[] = [];
-  const edgeSet = new Set<string>();
-  
-  for (const [, family] of tree.families) {
-    const husbandId = family.husbandId;
-    const wifeId = family.wifeId;
-    
-    const husbandVisible = husbandId && visiblePersons.has(husbandId);
-    const wifeVisible = wifeId && visiblePersons.has(wifeId);
-    
-    // Получаем позиции супругов
-    const husbandPos = husbandId ? nodePositions.get(husbandId) : null;
-    const wifePos = wifeId ? nodePositions.get(wifeId) : null;
-    
-    // Определяем, есть ли видимые дети
-    const visibleChildren = family.childrenIds.filter(id => visiblePersons.has(id));
-    const hasVisibleChildren = visibleChildren.length > 0;
-    
-    // Вычисляем позицию семейного узла (середина между супругами)
-    let familyNodeX: number | null = null;
-    let familyNodeY: number | null = null;
-    
-    if (husbandVisible && wifeVisible && husbandPos && wifePos) {
-      // Оба супруга видны - семейный узел посередине между ними
-      const leftPos = husbandPos.x < wifePos.x ? husbandPos : wifePos;
-      const rightPos = husbandPos.x < wifePos.x ? wifePos : husbandPos;
-      const leftId = husbandPos.x < wifePos.x ? husbandId! : wifeId!;
-      const rightId = husbandPos.x < wifePos.x ? wifeId! : husbandId!;
-      
-      // Позиция семейного узла - посередине между карточками
-      familyNodeX = (leftPos.x + CARD_WIDTH + rightPos.x) / 2 - FAMILY_NODE_SIZE / 2;
-      familyNodeY = leftPos.y + CARD_HEIGHT / 2 - FAMILY_NODE_SIZE / 2;
-      
-      // Создаём семейный узел, если есть дети
-      if (hasVisibleChildren) {
-        const familyNodeId = `family-${family.id}`;
-        nodes.push({
-          id: familyNodeId,
-          type: 'familyNode',
-          position: { x: familyNodeX, y: familyNodeY },
-          data: {},
-          draggable: false,
-          selectable: false,
-        });
-        nodePositions.set(familyNodeId, { x: familyNodeX, y: familyNodeY });
-        
-        // Линия от левого супруга к семейному узлу
-        const leftEdgeId = `spouse-left-${family.id}`;
-        if (!edgeSet.has(leftEdgeId)) {
-          edgeSet.add(leftEdgeId);
-          edges.push({
-            id: leftEdgeId,
-            source: leftId,
-            target: familyNodeId,
-            type: 'spouse',
-            sourceHandle: 'right',
-            targetHandle: 'left',
-            style: { 
-              stroke: tree.settings.lineColor || '#8c8c8c',
-              strokeWidth: tree.settings.lineWidth || 2,
-            },
-            data: {},
-          });
-        }
-        
-        // Линия от семейного узла к правому супругу
-        const rightEdgeId = `spouse-right-${family.id}`;
-        if (!edgeSet.has(rightEdgeId)) {
-          edgeSet.add(rightEdgeId);
-          edges.push({
-            id: rightEdgeId,
-            source: familyNodeId,
-            target: rightId,
-            type: 'spouse',
-            sourceHandle: 'right',
-            targetHandle: 'left',
-            style: { 
-              stroke: tree.settings.lineColor || '#8c8c8c',
-              strokeWidth: tree.settings.lineWidth || 2,
-            },
-            data: {},
-          });
-        }
-        
-        // Связи от семейного узла к детям
-        for (const childId of visibleChildren) {
-          const edgeId = `child-${family.id}-${childId}`;
-          if (!edgeSet.has(edgeId)) {
-            edgeSet.add(edgeId);
-            edges.push({
-              id: edgeId,
-              source: familyNodeId,
-              target: childId,
-              type: 'parentChild',
-              sourceHandle: 'bottom',
-              targetHandle: 'top',
-              style: { 
-                stroke: tree.settings.lineColor || '#8c8c8c',
-                strokeWidth: tree.settings.lineWidth || 2,
-              },
-              data: {},
-            });
-          }
-        }
-      } else {
-        // Нет детей - просто прямая линия между супругами
-        const edgeId = `spouse-${husbandId}-${wifeId}`;
-        if (!edgeSet.has(edgeId)) {
-          edgeSet.add(edgeId);
-          edges.push({
-            id: edgeId,
-            source: leftId,
-            target: rightId,
-            type: 'spouse',
-            sourceHandle: 'right',
-            targetHandle: 'left',
-            style: { 
-              stroke: tree.settings.lineColor || '#8c8c8c',
-              strokeWidth: tree.settings.lineWidth || 2,
-            },
-            data: {},
-          });
-        }
-      }
-    } else if ((husbandVisible && husbandPos) || (wifeVisible && wifePos)) {
-      // Только один супруг виден - линии к детям идут напрямую от него
-      const parentId = husbandVisible ? husbandId! : wifeId!;
-      
-      for (const childId of visibleChildren) {
-        const edgeId = `child-${family.id}-${childId}`;
-        if (!edgeSet.has(edgeId)) {
-          edgeSet.add(edgeId);
-          edges.push({
-            id: edgeId,
-            source: parentId,
-            target: childId,
-            type: 'parentChild',
-            sourceHandle: 'bottom',
-            targetHandle: 'top',
-            style: { 
-              stroke: tree.settings.lineColor || '#8c8c8c',
-              strokeWidth: tree.settings.lineWidth || 2,
-            },
-            data: {},
-          });
-        }
-      }
-    }
-  }
   
   return { nodes, edges, generationYPositions };
 }

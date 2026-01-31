@@ -5,34 +5,59 @@ import ReactFlow, {
   Controls,
   MiniMap,
   useNodesState,
-  useEdgesState,
   type NodeChange,
   type Node,
   BackgroundVariant,
   type ReactFlowInstance,
   SelectionMode,
+  useViewport,
+  ReactFlowProvider,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import type { FamilyTree, Person } from '../../types';
 import { buildFlowGraph } from '../../utils/treeUtils';
 import PersonCard from '../PersonCard/PersonCard';
-import FamilyNode from '../FamilyNode/FamilyNode';
-import { edgeTypes } from '../CustomEdges';
+import FamilyLines from '../FamilyLines/FamilyLines';
 import styles from './FamilyTreeView.module.scss';
 
 // Регистрируем кастомные типы узлов
 const nodeTypes = {
   personCard: PersonCard,
-  familyNode: FamilyNode,
 };
 
-interface FamilyTreeViewProps {
+interface FamilyTreeViewInnerProps {
   tree: FamilyTree;
   onPersonSelect?: (person: Person | null) => void;
   onPersonsMove?: (moves: Array<{ personId: string; offsetX: number }>) => void;
 }
 
-const FamilyTreeView: React.FC<FamilyTreeViewProps> = ({
+// Компонент SVG-слоя с линиями
+const LinesLayer: React.FC<{ nodes: Node[]; tree: FamilyTree }> = ({ nodes, tree }) => {
+  const viewport = useViewport();
+  
+  return (
+    <svg
+      className={styles.linesLayer}
+      style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        width: '100%',
+        height: '100%',
+        pointerEvents: 'none',
+        overflow: 'visible',
+        zIndex: 0,
+      }}
+    >
+      <g transform={`translate(${viewport.x}, ${viewport.y}) scale(${viewport.zoom})`}>
+        <FamilyLines nodes={nodes} tree={tree} />
+      </g>
+    </svg>
+  );
+};
+
+// Внутренний компонент с доступом к viewport
+const FamilyTreeViewInner: React.FC<FamilyTreeViewInnerProps> = ({
   tree,
   onPersonSelect,
   onPersonsMove,
@@ -46,12 +71,11 @@ const FamilyTreeView: React.FC<FamilyTreeViewProps> = ({
   // Начальные позиции при начале перетаскивания
   const dragStartPositions = useRef<Map<string, { x: number; y: number }>>(new Map());
   
-  // Строим граф из данных дерева
-  const { initialNodes, initialEdges, generationYPositions } = useMemo(() => {
+  // Строим граф из данных дерева (без edges - мы рисуем линии сами)
+  const { initialNodes, generationYPositions } = useMemo(() => {
     const result = buildFlowGraph(tree);
     return { 
-      initialNodes: result.nodes, 
-      initialEdges: result.edges,
+      initialNodes: result.nodes.filter(n => n.type === 'personCard'), // Только карточки персон
       generationYPositions: result.generationYPositions,
     };
   }, [tree]);
@@ -62,15 +86,13 @@ const FamilyTreeView: React.FC<FamilyTreeViewProps> = ({
   }, [generationYPositions]);
   
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   
   // Обновляем узлы при изменении дерева
   useEffect(() => {
     const result = buildFlowGraph(tree);
     generationYPositionsRef.current = result.generationYPositions;
-    setNodes(result.nodes);
-    setEdges(result.edges);
-  }, [tree, setNodes, setEdges]);
+    setNodes(result.nodes.filter(n => n.type === 'personCard'));
+  }, [tree, setNodes]);
   
   // Обработка изменения узлов (перемещение) - ограничиваем только горизонтальное
   const handleNodesChange = useCallback((changes: NodeChange[]) => {
@@ -89,12 +111,10 @@ const FamilyTreeView: React.FC<FamilyTreeViewProps> = ({
         // Во время перетаскивания - блокируем изменение Y
         if (change.position) {
           const node = nodes.find(n => n.id === change.id);
-          if (node) {
+          if (node && node.data.generation !== undefined) {
             // Сохраняем только горизонтальное перемещение, Y остается фиксированным
             const generation = node.data.generation;
-            const fixedY = generation !== undefined 
-              ? generationYPositionsRef.current.get(generation) ?? node.position.y
-              : node.position.y;
+            const fixedY = generationYPositionsRef.current.get(generation) ?? node.position.y;
             
             modifiedChanges.push({
               ...change,
@@ -112,7 +132,7 @@ const FamilyTreeView: React.FC<FamilyTreeViewProps> = ({
           const startPos = dragStartPositions.current.get(change.id);
           if (startPos && change.position) {
             const node = nodes.find(n => n.id === change.id);
-            if (node) {
+            if (node && node.data.person) {
               const offsetX = change.position.x - startPos.x + (node.data.person.displaySettings?.customPosition?.offsetX || 0);
               
               // Если выделено несколько узлов, собираем все смещения
@@ -120,7 +140,7 @@ const FamilyTreeView: React.FC<FamilyTreeViewProps> = ({
               if (selectedNodes.length > 1) {
                 const moves = selectedNodes.map(n => {
                   const start = dragStartPositions.current.get(n.id);
-                  const currentOffset = n.data.person.displaySettings?.customPosition?.offsetX || 0;
+                  const currentOffset = n.data.person?.displaySettings?.customPosition?.offsetX || 0;
                   const newOffset = start ? n.position.x - start.x + currentOffset : currentOffset;
                   return { personId: n.id, offsetX: newOffset };
                 });
@@ -172,14 +192,12 @@ const FamilyTreeView: React.FC<FamilyTreeViewProps> = ({
     <div ref={reactFlowWrapper} className={styles.container} style={containerStyle}>
       <ReactFlow
         nodes={nodes}
-        edges={edges}
+        edges={[]} // Не используем edges React Flow
         onNodesChange={handleNodesChange}
-        onEdgesChange={onEdgesChange}
         onNodeClick={handleNodeClick}
         onPaneClick={handlePaneClick}
         onInit={onInit}
         nodeTypes={nodeTypes}
-        edgeTypes={edgeTypes}
         fitView
         minZoom={0.1}
         maxZoom={2}
@@ -188,6 +206,9 @@ const FamilyTreeView: React.FC<FamilyTreeViewProps> = ({
         panOnDrag={[1, 2]} // Средняя и правая кнопки для pan
         selectNodesOnDrag={false}
       >
+        {/* SVG слой для линий */}
+        <LinesLayer nodes={nodes} tree={tree} />
+        
         <Background 
           variant={BackgroundVariant.Dots} 
           gap={20} 
@@ -206,6 +227,21 @@ const FamilyTreeView: React.FC<FamilyTreeViewProps> = ({
         />
       </ReactFlow>
     </div>
+  );
+};
+
+// Обёртка с ReactFlowProvider
+interface FamilyTreeViewProps {
+  tree: FamilyTree;
+  onPersonSelect?: (person: Person | null) => void;
+  onPersonsMove?: (moves: Array<{ personId: string; offsetX: number }>) => void;
+}
+
+const FamilyTreeView: React.FC<FamilyTreeViewProps> = (props) => {
+  return (
+    <ReactFlowProvider>
+      <FamilyTreeViewInner {...props} />
+    </ReactFlowProvider>
   );
 };
 
