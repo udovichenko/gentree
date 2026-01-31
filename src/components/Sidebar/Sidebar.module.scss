@@ -1,0 +1,57 @@
+@import '../../styles/variables.scss';
+
+.drawer {
+  :global(.ant-drawer-body) {
+    padding: 0;
+  }
+  
+  :global(.ant-tabs) {
+    height: 100%;
+  }
+  
+  :global(.ant-tabs-content) {
+    padding: 16px;
+    height: calc(100% - 46px);
+    overflow-y: auto;
+  }
+}
+
+.personInfo {
+  .relatives {
+    margin-top: 16px;
+    
+    :global(.ant-collapse-header) {
+      padding: 8px 0 !important;
+    }
+    
+    :global(.ant-collapse-content-box) {
+      padding: 0 0 8px 0 !important;
+    }
+  }
+  
+  .relativeName {
+    padding: 4px 0;
+    font-size: 13px;
+    color: $text-color;
+    cursor: pointer;
+    
+    &:hover {
+      color: $primary-color;
+    }
+  }
+}
+
+.settingsForm {
+  :global(.ant-form-item) {
+    margin-bottom: 16px;
+  }
+  
+  :global(.ant-form-item-label) {
+    padding-bottom: 4px;
+    
+    label {
+      font-size: 13px;
+      color: $text-color-secondary;
+    }
+  }
+}

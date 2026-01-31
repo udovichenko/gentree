@@ -1,0 +1,54 @@
+@import '../../styles/variables.scss';
+
+.drawer {
+  :global(.ant-drawer-body) {
+    padding: 16px;
+    overflow-y: auto;
+  }
+}
+
+.section {
+  margin-bottom: 16px;
+  
+  h5 {
+    margin-bottom: 8px;
+  }
+}
+
+.relatives {
+  margin-top: 8px;
+  
+  :global(.ant-collapse-header) {
+    padding: 8px 0 !important;
+  }
+  
+  :global(.ant-collapse-content-box) {
+    padding: 0 0 8px 0 !important;
+  }
+}
+
+.relativeName {
+  padding: 4px 0;
+  font-size: 13px;
+  color: $text-color;
+  cursor: pointer;
+  
+  &:hover {
+    color: $primary-color;
+  }
+}
+
+.form {
+  :global(.ant-form-item) {
+    margin-bottom: 12px;
+  }
+  
+  :global(.ant-form-item-label) {
+    padding-bottom: 4px;
+    
+    label {
+      font-size: 13px;
+      color: $text-color-secondary;
+    }
+  }
+}

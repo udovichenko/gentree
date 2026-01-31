@@ -1,0 +1,38 @@
+// Цвета
+$primary-color: #1890ff;
+$success-color: #52c41a;
+$warning-color: #faad14;
+$error-color: #ff4d4f;
+
+$text-color: #262626;
+$text-color-secondary: #8c8c8c;
+
+$border-color: #d9d9d9;
+$border-color-light: #f0f0f0;
+
+$background-color: #f5f5f5;
+$background-color-light: #fafafa;
+
+// Карточки
+$card-border-radius-none: 0;
+$card-border-radius-small: 4px;
+$card-border-radius-medium: 8px;
+$card-border-radius-large: 16px;
+
+// Размеры карточки человека
+$person-card-width: 200px;
+$person-card-min-height: 100px;
+
+// Тени
+$shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+$shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+$shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+
+// Анимации
+$transition-fast: 0.15s ease;
+$transition-normal: 0.3s ease;
+
+// Z-index
+$z-sidebar: 100;
+$z-toolbar: 200;
+$z-modal: 1000;

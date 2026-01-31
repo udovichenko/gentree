@@ -1,0 +1,43 @@
+@import './variables.scss';
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+// React Flow стили
+.react-flow__node {
+  // Убираем стандартные стили узлов
+}
+
+.react-flow__edge-path {
+  stroke-linecap: round;
+}
+
+// Ant Design кастомизация
+.ant-layout {
+  height: 100%;
+}
+
+.ant-layout-sider {
+  background: #fff;
+  border-right: 1px solid $border-color;
+}
+
+.ant-layout-content {
+  position: relative;
+  overflow: hidden;
+}

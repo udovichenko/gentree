@@ -1,0 +1,27 @@
+@import '../../styles/variables.scss';
+
+.drawer {
+  :global(.ant-drawer-body) {
+    padding: 16px;
+  }
+}
+
+.form {
+  :global(.ant-form-item) {
+    margin-bottom: 16px;
+  }
+  
+  :global(.ant-form-item-label) {
+    padding-bottom: 4px;
+    
+    label {
+      font-size: 13px;
+      color: $text-color-secondary;
+    }
+  }
+  
+  :global(.ant-divider) {
+    margin: 16px 0 12px;
+    font-size: 12px;
+  }
+}
