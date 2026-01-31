@@ -1,0 +1,15 @@
+@import '../../styles/variables.scss';
+
+.familyNode {
+  width: 10px;
+  height: 10px;
+  background: transparent;
+  position: relative;
+}
+
+.handle {
+  width: 6px;
+  height: 6px;
+  background: transparent;
+  border: none;
+}

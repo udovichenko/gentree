@@ -3,14 +3,21 @@ import type { Node, Edge } from 'reactflow';
 import { Position } from 'reactflow';
 import type { FamilyTree, Person, TreeSettings } from '../types';
 
-export type TreeNode = Node<{
+// Тип для узла персоны
+export type PersonNodeData = {
   person: Person;
   isRoot?: boolean;
   showPhoto?: boolean;
   generation?: number;
   baseColorMale?: string;
   baseColorFemale?: string;
-}>;
+};
+
+// Тип для узла семьи (невидимая точка соединения)
+export type FamilyNodeData = Record<string, never>;
+
+// Общий тип для всех узлов
+export type TreeNode = Node<PersonNodeData | FamilyNodeData>;
 
 export type TreeEdge = Edge<{
   spouseMidX?: number;
@@ -200,6 +207,7 @@ function normalizeGenerations(generations: Map<string, number>): Map<string, num
 // Константы раскладки (дефолтные)
 const CARD_WIDTH = 200;
 const CARD_HEIGHT = 120;
+const FAMILY_NODE_SIZE = 10;
 
 // Построение узлов и рёбер для React Flow
 export function buildFlowGraph(tree: FamilyTree): { nodes: TreeNode[]; edges: TreeEdge[]; generationYPositions: Map<number, number> } {
@@ -261,17 +269,15 @@ export function buildFlowGraph(tree: FamilyTree): { nodes: TreeNode[]; edges: Tr
     });
   }
   
-  // Создаем рёбра с новой логикой:
-  // 1. Горизонтальная линия между супругами (используем боковые handles)
-  // 2. От середины этой линии - ступенчатая линия к детям
-  const edges: TreeEdge[] = [];
-  const edgeSet = new Set<string>();
-  
-  // Сохраняем позиции узлов для расчёта spouseMidX
+  // Сохраняем позиции узлов для расчёта позиций семейных узлов
   const nodePositions = new Map<string, { x: number; y: number }>();
   for (const node of nodes) {
     nodePositions.set(node.id, { x: node.position.x, y: node.position.y });
   }
+  
+  // Создаём семейные узлы (невидимые точки соединения) и рёбра
+  const edges: TreeEdge[] = [];
+  const edgeSet = new Set<string>();
   
   for (const [, family] of tree.families) {
     const husbandId = family.husbandId;
@@ -284,60 +290,127 @@ export function buildFlowGraph(tree: FamilyTree): { nodes: TreeNode[]; edges: Tr
     const husbandPos = husbandId ? nodePositions.get(husbandId) : null;
     const wifePos = wifeId ? nodePositions.get(wifeId) : null;
     
-    // Вычисляем X середины линии между супругами
-    let spouseMidX: number | null = null;
+    // Определяем, есть ли видимые дети
+    const visibleChildren = family.childrenIds.filter(id => visiblePersons.has(id));
+    const hasVisibleChildren = visibleChildren.length > 0;
+    
+    // Вычисляем позицию семейного узла (середина между супругами)
+    let familyNodeX: number | null = null;
+    let familyNodeY: number | null = null;
     
     if (husbandVisible && wifeVisible && husbandPos && wifePos) {
-      // Оба супруга видны - горизонтальная линия между ними
-      // Определяем кто слева, кто справа
+      // Оба супруга видны - семейный узел посередине между ними
       const leftPos = husbandPos.x < wifePos.x ? husbandPos : wifePos;
       const rightPos = husbandPos.x < wifePos.x ? wifePos : husbandPos;
       const leftId = husbandPos.x < wifePos.x ? husbandId! : wifeId!;
       const rightId = husbandPos.x < wifePos.x ? wifeId! : husbandId!;
       
-      // Середина между карточками
-      spouseMidX = (leftPos.x + CARD_WIDTH + rightPos.x) / 2;
+      // Позиция семейного узла - посередине между карточками
+      familyNodeX = (leftPos.x + CARD_WIDTH + rightPos.x) / 2 - FAMILY_NODE_SIZE / 2;
+      familyNodeY = leftPos.y + CARD_HEIGHT / 2 - FAMILY_NODE_SIZE / 2;
       
-      const edgeId = `spouse-${husbandId}-${wifeId}`;
-      if (!edgeSet.has(edgeId)) {
-        edgeSet.add(edgeId);
-        edges.push({
-          id: edgeId,
-          source: leftId,
-          target: rightId,
-          type: 'spouse',
-          sourceHandle: 'right',
-          targetHandle: 'left',
-          style: { 
-            stroke: tree.settings.lineColor || '#8c8c8c',
-            strokeWidth: tree.settings.lineWidth || 2,
-          },
+      // Создаём семейный узел, если есть дети
+      if (hasVisibleChildren) {
+        const familyNodeId = `family-${family.id}`;
+        nodes.push({
+          id: familyNodeId,
+          type: 'familyNode',
+          position: { x: familyNodeX, y: familyNodeY },
           data: {},
+          draggable: false,
+          selectable: false,
         });
+        nodePositions.set(familyNodeId, { x: familyNodeX, y: familyNodeY });
+        
+        // Линия от левого супруга к семейному узлу
+        const leftEdgeId = `spouse-left-${family.id}`;
+        if (!edgeSet.has(leftEdgeId)) {
+          edgeSet.add(leftEdgeId);
+          edges.push({
+            id: leftEdgeId,
+            source: leftId,
+            target: familyNodeId,
+            type: 'spouse',
+            sourceHandle: 'right',
+            targetHandle: 'left',
+            style: { 
+              stroke: tree.settings.lineColor || '#8c8c8c',
+              strokeWidth: tree.settings.lineWidth || 2,
+            },
+            data: {},
+          });
+        }
+        
+        // Линия от семейного узла к правому супругу
+        const rightEdgeId = `spouse-right-${family.id}`;
+        if (!edgeSet.has(rightEdgeId)) {
+          edgeSet.add(rightEdgeId);
+          edges.push({
+            id: rightEdgeId,
+            source: familyNodeId,
+            target: rightId,
+            type: 'spouse',
+            sourceHandle: 'right',
+            targetHandle: 'left',
+            style: { 
+              stroke: tree.settings.lineColor || '#8c8c8c',
+              strokeWidth: tree.settings.lineWidth || 2,
+            },
+            data: {},
+          });
+        }
+        
+        // Связи от семейного узла к детям
+        for (const childId of visibleChildren) {
+          const edgeId = `child-${family.id}-${childId}`;
+          if (!edgeSet.has(edgeId)) {
+            edgeSet.add(edgeId);
+            edges.push({
+              id: edgeId,
+              source: familyNodeId,
+              target: childId,
+              type: 'parentChild',
+              sourceHandle: 'bottom',
+              targetHandle: 'top',
+              style: { 
+                stroke: tree.settings.lineColor || '#8c8c8c',
+                strokeWidth: tree.settings.lineWidth || 2,
+              },
+              data: {},
+            });
+          }
+        }
+      } else {
+        // Нет детей - просто прямая линия между супругами
+        const edgeId = `spouse-${husbandId}-${wifeId}`;
+        if (!edgeSet.has(edgeId)) {
+          edgeSet.add(edgeId);
+          edges.push({
+            id: edgeId,
+            source: leftId,
+            target: rightId,
+            type: 'spouse',
+            sourceHandle: 'right',
+            targetHandle: 'left',
+            style: { 
+              stroke: tree.settings.lineColor || '#8c8c8c',
+              strokeWidth: tree.settings.lineWidth || 2,
+            },
+            data: {},
+          });
+        }
       }
-    } else if (husbandVisible && husbandPos) {
-      spouseMidX = husbandPos.x + CARD_WIDTH / 2;
-    } else if (wifeVisible && wifePos) {
-      spouseMidX = wifePos.x + CARD_WIDTH / 2;
-    }
-    
-    // Связи к детям - все идут от одной точки (середины линии супругов)
-    if (spouseMidX !== null) {
-      for (const childId of family.childrenIds) {
-        if (!visiblePersons.has(childId)) continue;
-        
-        const childPos = nodePositions.get(childId);
-        if (!childPos) continue;
-        
-        // Выбираем одного родителя как источник
-        const sourceParentId = husbandVisible ? husbandId! : wifeId!;
-        
+    } else if ((husbandVisible && husbandPos) || (wifeVisible && wifePos)) {
+      // Только один супруг виден - линии к детям идут напрямую от него
+      const parentId = husbandVisible ? husbandId! : wifeId!;
+      
+      for (const childId of visibleChildren) {
         const edgeId = `child-${family.id}-${childId}`;
         if (!edgeSet.has(edgeId)) {
           edgeSet.add(edgeId);
           edges.push({
             id: edgeId,
-            source: sourceParentId,
+            source: parentId,
             target: childId,
             type: 'parentChild',
             sourceHandle: 'bottom',
@@ -346,9 +419,7 @@ export function buildFlowGraph(tree: FamilyTree): { nodes: TreeNode[]; edges: Tr
               stroke: tree.settings.lineColor || '#8c8c8c',
               strokeWidth: tree.settings.lineWidth || 2,
             },
-            data: { 
-              spouseMidX,
-            },
+            data: {},
           });
         }
       }

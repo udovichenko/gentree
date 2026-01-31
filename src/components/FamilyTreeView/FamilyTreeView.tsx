@@ -16,12 +16,14 @@ import 'reactflow/dist/style.css';
 import type { FamilyTree, Person } from '../../types';
 import { buildFlowGraph } from '../../utils/treeUtils';
 import PersonCard from '../PersonCard/PersonCard';
+import FamilyNode from '../FamilyNode/FamilyNode';
 import { edgeTypes } from '../CustomEdges';
 import styles from './FamilyTreeView.module.scss';
 
-// Регистрируем кастомный тип узла
+// Регистрируем кастомные типы узлов
 const nodeTypes = {
   personCard: PersonCard,
+  familyNode: FamilyNode,
 };
 
 interface FamilyTreeViewProps {
