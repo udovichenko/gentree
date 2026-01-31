@@ -115,6 +115,10 @@ export interface TreeSettings {
   lineColor?: string;
   lineWidth?: number;
   
+  // Базовые цвета карточек
+  baseColorMale: string;     // Цвет фона для мужчин
+  baseColorFemale: string;   // Цвет фона для женщин
+  
   // Настройки расстояний
   verticalSpacing: number;        // Расстояние между поколениями (по вертикали)
   horizontalSpacing: number;      // Расстояние между соседними ветками
@@ -169,6 +173,8 @@ export const defaultTreeSettings: TreeSettings = {
   },
   lineColor: '#8c8c8c',
   lineWidth: 2,
+  baseColorMale: '#e6f4ff',       // Светло-голубой для мужчин
+  baseColorFemale: '#fff0f6',     // Светло-розовый для женщин
   verticalSpacing: 150,
   horizontalSpacing: 50,
   spouseSpacing: 20,

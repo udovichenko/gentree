@@ -122,6 +122,20 @@ const TreeSettingsPanel: React.FC<TreeSettingsPanelProps> = ({
         
         <Divider>Визуальные настройки</Divider>
         
+        <Form.Item label="Базовый цвет карточек (мужчины)">
+          <ColorPicker
+            value={settings.baseColorMale || '#e6f4ff'}
+            onChange={(color) => onSettingsUpdate({ baseColorMale: color.toHexString() })}
+          />
+        </Form.Item>
+        
+        <Form.Item label="Базовый цвет карточек (женщины)">
+          <ColorPicker
+            value={settings.baseColorFemale || '#fff0f6'}
+            onChange={(color) => onSettingsUpdate({ baseColorFemale: color.toHexString() })}
+          />
+        </Form.Item>
+        
         <Form.Item label="Цвет фона дерева">
           <ColorPicker
             value={settings.backgroundColor || '#f5f5f5'}

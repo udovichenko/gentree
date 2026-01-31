@@ -10,11 +10,21 @@ interface PersonCardData {
   isRoot?: boolean;
   showPhoto?: boolean;
   generation?: number;
+  baseColorMale?: string;
+  baseColorFemale?: string;
 }
 
 const PersonCard: React.FC<NodeProps<PersonCardData>> = ({ data, selected }) => {
-  const { person, isRoot, showPhoto = true } = data;
+  const { person, isRoot, showPhoto = true, baseColorMale, baseColorFemale } = data;
   const settings = person.displaySettings || {};
+  
+  // Определяем базовый цвет на основе пола (если не задан индивидуальный)
+  const getBaseColor = () => {
+    if (settings.backgroundColor) return settings.backgroundColor;
+    if (person.sex === 'M' && baseColorMale) return baseColorMale;
+    if (person.sex === 'F' && baseColorFemale) return baseColorFemale;
+    return '#ffffff';
+  };
   
   // Определяем стили на основе настроек
   const borderRadiusMap = {
@@ -25,7 +35,7 @@ const PersonCard: React.FC<NodeProps<PersonCardData>> = ({ data, selected }) => 
   };
   
   const cardStyle: React.CSSProperties = {
-    backgroundColor: settings.backgroundColor || '#ffffff',
+    backgroundColor: getBaseColor(),
     backgroundImage: settings.backgroundImage ? `url(${settings.backgroundImage})` : undefined,
     backgroundSize: 'cover',
     backgroundPosition: 'center',
@@ -58,6 +68,21 @@ const PersonCard: React.FC<NodeProps<PersonCardData>> = ({ data, selected }) => 
         type="target"
         position={Position.Top}
         className={styles.handle}
+        id="top"
+      />
+      
+      {/* Хэндлы для супружеских связей (по бокам) */}
+      <Handle
+        type="source"
+        position={Position.Right}
+        className={styles.handle}
+        id="right"
+      />
+      <Handle
+        type="target"
+        position={Position.Left}
+        className={styles.handle}
+        id="left"
       />
       
       <div className={styles.content}>
@@ -102,6 +127,7 @@ const PersonCard: React.FC<NodeProps<PersonCardData>> = ({ data, selected }) => 
         type="source"
         position={Position.Bottom}
         className={styles.handle}
+        id="bottom"
       />
     </div>
   );

@@ -49,6 +49,29 @@ const Toolbar: React.FC<ToolbarProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [exportModalOpen, setExportModalOpen] = React.useState(false);
   const [exportScale, setExportScale] = React.useState(2);
+  const [estimatedSize, setEstimatedSize] = React.useState<{ width: number; height: number } | null>(null);
+  
+  // Обновляем размер при открытии модала или изменении масштаба
+  React.useEffect(() => {
+    if (exportModalOpen && treeContainerRef.current) {
+      const flowElement = treeContainerRef.current.querySelector('.react-flow') as HTMLElement;
+      if (flowElement) {
+        const viewport = flowElement.querySelector('.react-flow__viewport') as HTMLElement;
+        if (viewport) {
+          const bounds = viewport.getBoundingClientRect();
+          setEstimatedSize({
+            width: Math.round(bounds.width * exportScale),
+            height: Math.round(bounds.height * exportScale),
+          });
+        } else {
+          setEstimatedSize({
+            width: Math.round(flowElement.clientWidth * exportScale),
+            height: Math.round(flowElement.clientHeight * exportScale),
+          });
+        }
+      }
+    }
+  }, [exportModalOpen, exportScale, treeContainerRef]);
   
   // Импорт файла
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -256,21 +279,35 @@ const Toolbar: React.FC<ToolbarProps> = ({
           <Form.Item label="Масштаб (качество изображения)">
             <Slider
               min={1}
-              max={4}
-              step={0.5}
+              max={8}
+              step={1}
               value={exportScale}
               onChange={setExportScale}
               marks={{
                 1: '1x',
                 2: '2x',
-                3: '3x',
                 4: '4x',
+                6: '6x',
+                8: '8x',
               }}
             />
-            <Text type="secondary">
-              Больший масштаб = выше качество и размер файла
-            </Text>
           </Form.Item>
+          
+          {estimatedSize && (
+            <Form.Item>
+              <Text>
+                Размер изображения: <strong>{estimatedSize.width} × {estimatedSize.height}</strong> px
+              </Text>
+              <br />
+              <Text type="secondary">
+                Приблизительный размер файла: ~{Math.round(estimatedSize.width * estimatedSize.height * 4 / 1024 / 1024 * 10) / 10} МБ
+              </Text>
+            </Form.Item>
+          )}
+          
+          <Text type="secondary">
+            Больший масштаб = выше качество, но больше размер файла
+          </Text>
         </Form>
       </Modal>
     </div>

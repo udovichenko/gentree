@@ -16,6 +16,7 @@ import 'reactflow/dist/style.css';
 import type { FamilyTree, Person } from '../../types';
 import { buildFlowGraph } from '../../utils/treeUtils';
 import PersonCard from '../PersonCard/PersonCard';
+import { edgeTypes } from '../CustomEdges';
 import styles from './FamilyTreeView.module.scss';
 
 // Регистрируем кастомный тип узла
@@ -176,6 +177,7 @@ const FamilyTreeView: React.FC<FamilyTreeViewProps> = ({
         onPaneClick={handlePaneClick}
         onInit={onInit}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         fitView
         minZoom={0.1}
         maxZoom={2}
@@ -183,10 +185,6 @@ const FamilyTreeView: React.FC<FamilyTreeViewProps> = ({
         selectionOnDrag
         panOnDrag={[1, 2]} // Средняя и правая кнопки для pan
         selectNodesOnDrag={false}
-        defaultEdgeOptions={{
-          type: 'smoothstep',
-          animated: false,
-        }}
       >
         <Background 
           variant={BackgroundVariant.Dots} 
