@@ -138,6 +138,10 @@ export interface TreeSettings {
   cardBorderStyle: 'none' | 'solid' | 'dashed' | 'dotted';
   cardBorderColor: string;
   cardBorderWidth: number;
+  
+  // Перемещение карточек
+  snapToGrid: boolean;            // Привязка к сетке при перемещении
+  snapGridSize: number;           // Размер шага сетки в пикселях
 }
 
 // Полное состояние дерева
@@ -202,4 +206,7 @@ export const defaultTreeSettings: TreeSettings = {
   cardBorderStyle: 'solid',
   cardBorderColor: '#d9d9d9',
   cardBorderWidth: 1,
+  // Перемещение карточек
+  snapToGrid: true,
+  snapGridSize: 8,
 };

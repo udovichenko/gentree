@@ -99,10 +99,10 @@ export function getRelationship(
 }
 
 // Преобразование пути в название отношения
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function pathToRelationshipName(
   path: RelationshipPath, 
   sex: 'M' | 'F' | 'U',
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _persons: Map<string, Person>
 ): string {
   if (path.length === 0) return 'Корень дерева';
@@ -239,8 +239,8 @@ export function formatDate(
 
 // Форматирование имени
 // given = "Имя Отчество" (может быть просто "Имя")
-// surname = "Фамилия"
-// maidenName = "Девичья фамилия"
+// surname = "Фамилия" (текущая, замужняя)
+// maidenName = "Девичья фамилия" (фамилия при рождении)
 export function formatName(
   name: { given: string; surname: string; maidenName?: string },
   options: {
@@ -255,8 +255,14 @@ export function formatName(
   const firstName = givenParts[0] || '';
   const patronymic = givenParts.slice(1).join(' '); // Всё после первого слова - отчество
   
-  // Формируем: Фамилия Имя [Отчество]
-  const parts: string[] = [name.surname];
+  // Формируем фамилию: Фамилия (девичья) или просто Фамилия
+  let surnameDisplay = name.surname;
+  if (showMaidenName && name.maidenName) {
+    surnameDisplay = `${name.surname} (${name.maidenName})`;
+  }
+  
+  // Формируем: Фамилия [(девичья)] Имя [Отчество]
+  const parts: string[] = [surnameDisplay];
   
   if (firstName) {
     parts.push(firstName);
@@ -266,12 +272,5 @@ export function formatName(
     parts.push(patronymic);
   }
   
-  let result = parts.join(' ');
-  
-  // Добавляем девичью фамилию в скобках
-  if (showMaidenName && name.maidenName) {
-    result += ` (урожд. ${name.maidenName})`;
-  }
-  
-  return result;
+  return parts.join(' ');
 }

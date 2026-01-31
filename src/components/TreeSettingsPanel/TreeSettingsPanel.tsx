@@ -178,6 +178,30 @@ const TreeSettingsPanel: React.FC<TreeSettingsPanelProps> = ({
           />
         </Form.Item>
         
+        <Divider>Перемещение карточек</Divider>
+        
+        <Form.Item label="Привязка к сетке">
+          <Switch
+            checked={settings.snapToGrid ?? true}
+            onChange={(checked) => onSettingsUpdate({ snapToGrid: checked })}
+          />
+        </Form.Item>
+        
+        <Form.Item label="Шаг сетки">
+          <Select
+            value={settings.snapGridSize ?? 8}
+            onChange={(value) => onSettingsUpdate({ snapGridSize: value })}
+            disabled={!(settings.snapToGrid ?? true)}
+            options={[
+              { value: 4, label: '4 px' },
+              { value: 8, label: '8 px' },
+              { value: 12, label: '12 px' },
+              { value: 16, label: '16 px' },
+              { value: 20, label: '20 px' },
+            ]}
+          />
+        </Form.Item>
+        
         <Divider>Расстояния</Divider>
         
         <Form.Item label="Расстояние между поколениями (вертикаль)">

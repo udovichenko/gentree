@@ -104,6 +104,16 @@ const FamilyTreeViewInner: React.FC<FamilyTreeViewInnerProps> = ({
   const handleNodesChange = useCallback((changes: NodeChange[]) => {
     const modifiedChanges: NodeChange[] = [];
     
+    // Получаем настройки snap to grid
+    const snapToGrid = tree.settings.snapToGrid ?? true;
+    const snapGridSize = tree.settings.snapGridSize ?? 8;
+    
+    // Функция для привязки к сетке
+    const snapToGridValue = (value: number): number => {
+      if (!snapToGrid) return value;
+      return Math.round(value / snapGridSize) * snapGridSize;
+    };
+    
     for (const change of changes) {
       if (change.type === 'position') {
         // Начало перетаскивания - сохраняем начальные позиции всех выделенных узлов
@@ -117,7 +127,7 @@ const FamilyTreeViewInner: React.FC<FamilyTreeViewInnerProps> = ({
           }
         }
         
-        // Во время перетаскивания - блокируем изменение Y
+        // Во время перетаскивания - блокируем изменение Y и применяем snap to grid
         if (change.position) {
           const node = nodes.find(n => n.id === change.id);
           if (node && node.data.generation !== undefined) {
@@ -127,7 +137,7 @@ const FamilyTreeViewInner: React.FC<FamilyTreeViewInnerProps> = ({
             modifiedChanges.push({
               ...change,
               position: {
-                x: change.position.x,
+                x: snapToGridValue(change.position.x),
                 y: fixedY,
               },
             });
@@ -172,7 +182,7 @@ const FamilyTreeViewInner: React.FC<FamilyTreeViewInnerProps> = ({
     }
     
     onNodesChange(modifiedChanges);
-  }, [nodes, onNodesChange, onPersonsMove]);
+  }, [nodes, onNodesChange, onPersonsMove, tree.settings.snapToGrid, tree.settings.snapGridSize]);
   
   // Обработка клика по узлу - открываем панель только если не multi-select
   const handleNodeClick = useCallback((event: React.MouseEvent, node: Node) => {

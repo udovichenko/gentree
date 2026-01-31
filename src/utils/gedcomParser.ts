@@ -165,12 +165,13 @@ function parseName(node: GedcomNode): PersonName {
   const match = node.value.match(/^([^/]*)\s*\/([^/]*)\/?\s*(.*)$/);
   
   let given = '';
-  let surname = '';
+  let birthSurname = ''; // Фамилия при рождении (из основного поля или SURN)
+  let marriedSurname = ''; // Фамилия в браке (_MARNM)
   let suffix = '';
   
   if (match) {
     given = match[1].trim();
-    surname = match[2].trim();
+    birthSurname = match[2].trim();
     suffix = match[3].trim();
   } else {
     given = node.value.trim();
@@ -183,11 +184,11 @@ function parseName(node: GedcomNode): PersonName {
         given = child.value;
         break;
       case 'SURN':
-        surname = child.value;
+        birthSurname = child.value;
         break;
       case '_MARNM':
-        // Фамилия в браке (используем как основную если нет SURN)
-        if (!surname) surname = child.value;
+        // Фамилия в браке
+        marriedSurname = child.value;
         break;
       case 'NSFX':
         suffix = child.value;
@@ -195,11 +196,21 @@ function parseName(node: GedcomNode): PersonName {
     }
   }
   
+  // Если есть фамилия в браке, то:
+  // surname = фамилия в браке (текущая)
+  // maidenName = фамилия при рождении (девичья)
+  // Если нет фамилии в браке, то surname = фамилия при рождении
+  const surname = marriedSurname || birthSurname;
+  const maidenName = marriedSurname && birthSurname && marriedSurname !== birthSurname 
+    ? birthSurname 
+    : undefined;
+  
   const fullName = [given, surname].filter(Boolean).join(' ');
   
   return {
     given,
     surname,
+    maidenName,
     suffix: suffix || undefined,
     fullName: fullName || 'Неизвестно',
   };
