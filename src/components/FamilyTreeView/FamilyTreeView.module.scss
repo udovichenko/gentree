@@ -6,6 +6,21 @@
   position: relative;
 }
 
+// Скрываем синий прямоугольник выделения после завершения выделения
+.hideSelectionBox {
+  :global(.react-flow__selection) {
+    display: none !important;
+  }
+  
+  :global(.react-flow__nodesselection) {
+    display: none !important;
+  }
+  
+  :global(.react-flow__nodesselection-rect) {
+    display: none !important;
+  }
+}
+
 .linesLayer {
   position: absolute;
   top: 0;

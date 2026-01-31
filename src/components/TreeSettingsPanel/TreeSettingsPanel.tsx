@@ -78,10 +78,103 @@ const TreeSettingsPanel: React.FC<TreeSettingsPanelProps> = ({
           />
         </Form.Item>
         
-        <Form.Item label="Показывать фото в карточках">
+        <Divider>Отображение карточек</Divider>
+        
+        <Form.Item label="Ширина карточки (px)">
+          <InputNumber
+            min={150}
+            max={300}
+            value={settings.cardWidth ?? 200}
+            onChange={(value) => onSettingsUpdate({ cardWidth: value ?? 200 })}
+            style={{ width: '100%' }}
+          />
+        </Form.Item>
+        
+        <Form.Item label="Показывать фото">
           <Switch
             checked={settings.showPhotos}
             onChange={(checked) => onSettingsUpdate({ showPhotos: checked })}
+          />
+        </Form.Item>
+        
+        <Form.Item label="Показывать место рождения">
+          <Switch
+            checked={settings.showBirthPlace ?? true}
+            onChange={(checked) => onSettingsUpdate({ showBirthPlace: checked })}
+          />
+        </Form.Item>
+        
+        <Form.Item label="Показывать кем приходится корню">
+          <Switch
+            checked={settings.showRelationship ?? true}
+            onChange={(checked) => onSettingsUpdate({ showRelationship: checked })}
+          />
+        </Form.Item>
+        
+        <Form.Item label="Полные даты (не только год)">
+          <Switch
+            checked={settings.showFullDates ?? false}
+            onChange={(checked) => onSettingsUpdate({ showFullDates: checked })}
+          />
+        </Form.Item>
+        
+        <Form.Item label="Скрыть отчества у всех">
+          <Switch
+            checked={settings.hidePatronymic ?? false}
+            onChange={(checked) => onSettingsUpdate({ hidePatronymic: checked })}
+          />
+        </Form.Item>
+        
+        <Form.Item label="Показывать девичью фамилию">
+          <Switch
+            checked={settings.showMaidenName ?? true}
+            onChange={(checked) => onSettingsUpdate({ showMaidenName: checked })}
+          />
+        </Form.Item>
+        
+        <Divider>Стиль рамки карточек</Divider>
+        
+        <Form.Item label="Скругление углов">
+          <Select
+            value={settings.cardBorderRadius ?? 'medium'}
+            onChange={(value) => onSettingsUpdate({ cardBorderRadius: value })}
+            options={[
+              { value: 'none', label: 'Без скругления' },
+              { value: 'small', label: 'Маленькое (4px)' },
+              { value: 'medium', label: 'Среднее (8px)' },
+              { value: 'large', label: 'Большое (16px)' },
+            ]}
+          />
+        </Form.Item>
+        
+        <Form.Item label="Стиль рамки">
+          <Select
+            value={settings.cardBorderStyle ?? 'solid'}
+            onChange={(value) => onSettingsUpdate({ cardBorderStyle: value })}
+            options={[
+              { value: 'none', label: 'Без рамки' },
+              { value: 'solid', label: 'Сплошная' },
+              { value: 'dashed', label: 'Пунктирная' },
+              { value: 'dotted', label: 'Точечная' },
+            ]}
+          />
+        </Form.Item>
+        
+        <Form.Item label="Цвет рамки">
+          <ColorPicker
+            value={settings.cardBorderColor || '#d9d9d9'}
+            onChange={(color) => onSettingsUpdate({ cardBorderColor: color.toHexString() })}
+          />
+        </Form.Item>
+        
+        <Form.Item label="Толщина рамки">
+          <InputNumber
+            min={0}
+            max={5}
+            value={settings.cardBorderWidth ?? 1}
+            onChange={(value) => onSettingsUpdate({ cardBorderWidth: value ?? 1 })}
+            addonAfter="px"
+            style={{ width: '100%' }}
           />
         </Form.Item>
         

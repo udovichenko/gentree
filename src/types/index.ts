@@ -124,8 +124,20 @@ export interface TreeSettings {
   horizontalSpacing: number;      // Расстояние между соседними ветками
   spouseSpacing: number;          // Расстояние между супругами
   
-  // Отображение
+  // Отображение карточек
   showPhotos: boolean;            // Показывать фото в карточках
+  cardWidth: number;              // Ширина карточки в пикселях
+  showBirthPlace: boolean;        // Показывать место рождения
+  showRelationship: boolean;      // Показывать кем приходится корню (мать, дед и т.д.)
+  showFullDates: boolean;         // Показывать полные даты (не только год)
+  hidePatronymic: boolean;        // Скрыть отчества
+  showMaidenName: boolean;        // Показывать девичью фамилию
+  
+  // Стиль карточек (общий для всех)
+  cardBorderRadius: 'none' | 'small' | 'medium' | 'large';
+  cardBorderStyle: 'none' | 'solid' | 'dashed' | 'dotted';
+  cardBorderColor: string;
+  cardBorderWidth: number;
 }
 
 // Полное состояние дерева
@@ -179,4 +191,15 @@ export const defaultTreeSettings: TreeSettings = {
   horizontalSpacing: 50,
   spouseSpacing: 20,
   showPhotos: true,
+  cardWidth: 200,                 // Ширина карточки по умолчанию
+  showBirthPlace: true,           // Показывать место рождения
+  showRelationship: true,         // Показывать кем приходится
+  showFullDates: false,           // По умолчанию только год
+  hidePatronymic: false,          // По умолчанию показывать отчества
+  showMaidenName: true,           // По умолчанию показывать девичью фамилию
+  // Стиль карточек
+  cardBorderRadius: 'medium',
+  cardBorderStyle: 'solid',
+  cardBorderColor: '#d9d9d9',
+  cardBorderWidth: 1,
 };

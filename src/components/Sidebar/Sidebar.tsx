@@ -368,6 +368,53 @@ const Sidebar: React.FC<SidebarProps> = ({
           />
         </Form.Item>
         
+        <Divider>Отображение карточек</Divider>
+        
+        <Form.Item label="Ширина карточки">
+          <Slider
+            min={150}
+            max={300}
+            value={settings.cardWidth ?? 200}
+            onChange={(value) => onTreeSettingsUpdate({ cardWidth: value })}
+            marks={{ 150: '150', 200: '200', 250: '250', 300: '300' }}
+          />
+        </Form.Item>
+        
+        <Form.Item label="Показывать фото">
+          <Switch
+            checked={settings.showPhotos}
+            onChange={(checked) => onTreeSettingsUpdate({ showPhotos: checked })}
+          />
+        </Form.Item>
+        
+        <Form.Item label="Показывать место рождения">
+          <Switch
+            checked={settings.showBirthPlace ?? true}
+            onChange={(checked) => onTreeSettingsUpdate({ showBirthPlace: checked })}
+          />
+        </Form.Item>
+        
+        <Form.Item label="Показывать кем приходится">
+          <Switch
+            checked={settings.showRelationship ?? true}
+            onChange={(checked) => onTreeSettingsUpdate({ showRelationship: checked })}
+          />
+        </Form.Item>
+        
+        <Form.Item label="Полные даты (не только год)">
+          <Switch
+            checked={settings.showFullDates ?? false}
+            onChange={(checked) => onTreeSettingsUpdate({ showFullDates: checked })}
+          />
+        </Form.Item>
+        
+        <Form.Item label="Скрыть отчества">
+          <Switch
+            checked={settings.hidePatronymic ?? false}
+            onChange={(checked) => onTreeSettingsUpdate({ hidePatronymic: checked })}
+          />
+        </Form.Item>
+        
         <Divider>Визуальные настройки</Divider>
         
         <Form.Item label="Цвет фона дерева">

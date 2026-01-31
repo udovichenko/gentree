@@ -1,7 +1,7 @@
 @import '../../styles/variables.scss';
 
 .card {
-  width: $person-card-width;
+  min-width: 150px;
   min-height: $person-card-min-height;
   padding: 12px;
   cursor: pointer;
@@ -69,6 +69,15 @@
   flex: 1;
   min-width: 0;
   overflow: hidden;
+}
+
+.relationship {
+  font-size: 10px;
+  color: $primary-color;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 2px;
 }
 
 .name {

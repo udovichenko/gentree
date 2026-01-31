@@ -1,5 +1,5 @@
 // Основной компонент визуализации дерева
-import React, { useCallback, useMemo, useRef, useEffect } from 'react';
+import React, { useCallback, useMemo, useRef, useEffect, useState } from 'react';
 import ReactFlow, {
   Background,
   Controls,
@@ -71,6 +71,12 @@ const FamilyTreeViewInner: React.FC<FamilyTreeViewInnerProps> = ({
   // Начальные позиции при начале перетаскивания
   const dragStartPositions = useRef<Map<string, { x: number; y: number }>>(new Map());
   
+  // Флаг для отслеживания, была ли зажата клавиша модификатора при клике
+  const isMultiSelectRef = useRef(false);
+  
+  // Флаг для скрытия selection box после завершения выделения
+  const [isSelecting, setIsSelecting] = useState(false);
+  
   // Строим граф из данных дерева (без edges - мы рисуем линии сами)
   const { initialNodes, generationYPositions } = useMemo(() => {
     const result = buildFlowGraph(tree);
@@ -100,11 +106,14 @@ const FamilyTreeViewInner: React.FC<FamilyTreeViewInnerProps> = ({
     
     for (const change of changes) {
       if (change.type === 'position') {
-        // Начало перетаскивания - сохраняем начальные позиции
+        // Начало перетаскивания - сохраняем начальные позиции всех выделенных узлов
         if (change.dragging === true) {
-          const node = nodes.find(n => n.id === change.id);
-          if (node) {
-            dragStartPositions.current.set(change.id, { ...node.position });
+          // Сохраняем позиции всех выделенных узлов
+          const selectedNodes = nodes.filter(n => n.selected || n.id === change.id);
+          for (const node of selectedNodes) {
+            if (!dragStartPositions.current.has(node.id)) {
+              dragStartPositions.current.set(node.id, { ...node.position });
+            }
           }
         }
         
@@ -112,7 +121,6 @@ const FamilyTreeViewInner: React.FC<FamilyTreeViewInnerProps> = ({
         if (change.position) {
           const node = nodes.find(n => n.id === change.id);
           if (node && node.data.generation !== undefined) {
-            // Сохраняем только горизонтальное перемещение, Y остается фиксированным
             const generation = node.data.generation;
             const fixedY = generationYPositionsRef.current.get(generation) ?? node.position.y;
             
@@ -127,30 +135,36 @@ const FamilyTreeViewInner: React.FC<FamilyTreeViewInnerProps> = ({
           }
         }
         
-        // Конец перетаскивания - сохраняем смещения
+        // Конец перетаскивания - сохраняем смещения В ИСТОРИЮ
         if (change.dragging === false) {
-          const startPos = dragStartPositions.current.get(change.id);
-          if (startPos && change.position) {
-            const node = nodes.find(n => n.id === change.id);
+          // Собираем все перемещённые узлы
+          const movedNodes: Array<{ personId: string; offsetX: number }> = [];
+          
+          for (const [nodeId, startPos] of dragStartPositions.current) {
+            const node = nodes.find(n => n.id === nodeId);
             if (node && node.data.person) {
-              const offsetX = change.position.x - startPos.x + (node.data.person.displaySettings?.customPosition?.offsetX || 0);
+              // Текущая позиция узла (после перетаскивания)
+              const currentX = node.position.x;
+              const deltaX = currentX - startPos.x;
               
-              // Если выделено несколько узлов, собираем все смещения
-              const selectedNodes = nodes.filter(n => n.selected);
-              if (selectedNodes.length > 1) {
-                const moves = selectedNodes.map(n => {
-                  const start = dragStartPositions.current.get(n.id);
-                  const currentOffset = n.data.person?.displaySettings?.customPosition?.offsetX || 0;
-                  const newOffset = start ? n.position.x - start.x + currentOffset : currentOffset;
-                  return { personId: n.id, offsetX: newOffset };
+              // Если было реальное смещение
+              if (Math.abs(deltaX) > 1) {
+                const currentOffset = node.data.person.displaySettings?.customPosition?.offsetX || 0;
+                movedNodes.push({
+                  personId: nodeId,
+                  offsetX: currentOffset + deltaX,
                 });
-                onPersonsMove?.(moves);
-              } else {
-                onPersonsMove?.([{ personId: change.id, offsetX: offsetX }]);
               }
             }
           }
-          dragStartPositions.current.delete(change.id);
+          
+          // Очищаем сохранённые позиции
+          dragStartPositions.current.clear();
+          
+          // Вызываем callback для сохранения в историю
+          if (movedNodes.length > 0) {
+            onPersonsMove?.(movedNodes);
+          }
         }
       }
       
@@ -160,11 +174,28 @@ const FamilyTreeViewInner: React.FC<FamilyTreeViewInnerProps> = ({
     onNodesChange(modifiedChanges);
   }, [nodes, onNodesChange, onPersonsMove]);
   
-  // Обработка клика по узлу
-  const handleNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
+  // Обработка клика по узлу - открываем панель только если не multi-select
+  const handleNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
+    // Если зажат Shift, Ctrl или Cmd - это multi-select, не открываем панель
+    if (event.shiftKey || event.ctrlKey || event.metaKey) {
+      isMultiSelectRef.current = true;
+      return;
+    }
+    
+    isMultiSelectRef.current = false;
     const person = tree.persons.get(node.id);
     onPersonSelect?.(person || null);
   }, [tree, onPersonSelect]);
+  
+  // Обработка начала выделения рамкой
+  const handleSelectionStart = useCallback(() => {
+    setIsSelecting(true);
+  }, []);
+  
+  // Обработка окончания выделения рамкой
+  const handleSelectionEnd = useCallback(() => {
+    setIsSelecting(false);
+  }, []);
   
   // Клик по пустому месту - снимаем выделение
   const handlePaneClick = useCallback(() => {
@@ -189,13 +220,15 @@ const FamilyTreeViewInner: React.FC<FamilyTreeViewInnerProps> = ({
   }), [tree.settings.backgroundColor, tree.settings.backgroundImage]);
   
   return (
-    <div ref={reactFlowWrapper} className={styles.container} style={containerStyle}>
+    <div ref={reactFlowWrapper} className={`${styles.container} ${!isSelecting ? styles.hideSelectionBox : ''}`} style={containerStyle}>
       <ReactFlow
         nodes={nodes}
         edges={[]} // Не используем edges React Flow
         onNodesChange={handleNodesChange}
         onNodeClick={handleNodeClick}
         onPaneClick={handlePaneClick}
+        onSelectionStart={handleSelectionStart}
+        onSelectionEnd={handleSelectionEnd}
         onInit={onInit}
         nodeTypes={nodeTypes}
         fitView
@@ -204,7 +237,12 @@ const FamilyTreeViewInner: React.FC<FamilyTreeViewInnerProps> = ({
         selectionMode={SelectionMode.Partial}
         selectionOnDrag
         panOnDrag={[1, 2]} // Средняя и правая кнопки для pan
+        panOnScroll  // Двухпальцевый скролл на тачпаде = pan
+        zoomOnScroll={false} // Отключаем zoom по скроллу, чтобы тачпад работал для pan
+        zoomOnPinch  // Но зум по щипку оставляем
         selectNodesOnDrag={false}
+        selectionKeyCode={null}  // Убираем требование Shift для выделения рамкой
+        multiSelectionKeyCode="Shift" // Shift или Ctrl/Cmd для multi-select
       >
         {/* SVG слой для линий */}
         <LinesLayer nodes={nodes} tree={tree} />
