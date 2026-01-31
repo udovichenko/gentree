@@ -1,60 +1,63 @@
 // Кастомный edge для связи супругов с детьми
 import React from 'react';
-import { BaseEdge, getStraightPath, type EdgeProps } from 'reactflow';
+import { BaseEdge, type EdgeProps } from 'reactflow';
 
-interface FamilyEdgeData {
-  type: 'spouse' | 'parent-child';
-  spouseMidX?: number;
-  spouseMidY?: number;
+interface SpouseEdgeData {
+  // Реальные координаты для горизонтальной линии между супругами
+  lineY: number;      // Y координата горизонтальной линии
+  sourceX: number;    // X правого края карточки мужа
+  targetX: number;    // X левого края карточки жены
 }
 
-// Прямой edge для связи супругов (горизонтальная линия)
-export const SpouseEdge: React.FC<EdgeProps<FamilyEdgeData>> = ({
+interface ParentChildEdgeData {
+  // Точка начала (середина линии супругов)
+  spouseMidX: number;
+  spouseMidY: number;
+  // Точка конца (верх карточки ребёнка)
+  childX: number;
+  childY: number;
+}
+
+// Прямой edge для связи супругов (строго горизонтальная линия)
+export const SpouseEdge: React.FC<EdgeProps<SpouseEdgeData>> = ({
   id,
-  sourceX,
-  sourceY,
-  targetX,
-  targetY,
+  data,
   style,
 }) => {
-  // Прямая горизонтальная линия между супругами
-  const [edgePath] = getStraightPath({
-    sourceX,
-    sourceY,
-    targetX,
-    targetY,
-  });
+  if (!data) return null;
+  
+  const { lineY, sourceX, targetX } = data;
+  
+  // Строго горизонтальная линия
+  const path = `M ${sourceX} ${lineY} L ${targetX} ${lineY}`;
 
   return (
     <BaseEdge
       id={id}
-      path={edgePath}
+      path={path}
       style={style}
     />
   );
 };
 
 // Edge от центра линии супругов к ребенку
-export const ParentChildEdge: React.FC<EdgeProps<FamilyEdgeData>> = ({
+export const ParentChildEdge: React.FC<EdgeProps<ParentChildEdgeData>> = ({
   id,
-  sourceX,
-  sourceY,
-  targetX,
-  targetY,
-  style,
   data,
+  style,
 }) => {
-  // Если есть данные о середине супругов, используем её
-  const startX = data?.spouseMidX ?? sourceX;
-  const startY = data?.spouseMidY ?? sourceY;
+  if (!data) return null;
   
-  // Создаём путь: вертикально вниз, потом горизонтально к центру ребёнка, потом вниз
-  const midY = startY + (targetY - startY) / 2;
+  const { spouseMidX, spouseMidY, childX, childY } = data;
   
-  const path = `M ${startX} ${startY} 
-                L ${startX} ${midY} 
-                L ${targetX} ${midY} 
-                L ${targetX} ${targetY}`;
+  // Вычисляем Y для горизонтального участка (посередине между линией супругов и ребёнком)
+  const midY = spouseMidY + (childY - spouseMidY) / 2;
+  
+  // Путь: вниз от линии супругов -> горизонтально к ребёнку -> вниз к ребёнку
+  const path = `M ${spouseMidX} ${spouseMidY} 
+                L ${spouseMidX} ${midY} 
+                L ${childX} ${midY} 
+                L ${childX} ${childY}`;
   
   return (
     <BaseEdge
